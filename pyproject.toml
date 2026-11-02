@@ -5,14 +5,50 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aistackops"
 version = "1.0.0"
-description = "AiStackOps - Universal AI-Native OpenStack Cloud Copilot (Skill + MCP Server + Safe CLI)"
+description = "AiStackOps - Universal AI-Native OpenStack Cloud Copilot (MCP Server, Agent Skill & Safe CLI Engine)"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
+keywords = [
+    "openstack",
+    "aiops",
+    "mcp",
+    "model-context-protocol",
+    "cloud-copilot",
+    "devops",
+    "horizon",
+    "nova",
+    "neutron",
+    "cinder",
+    "security-groups",
+    "firewall",
+    "claude-skill",
+    "opencode",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Security",
+]
 dependencies = [
     "requests>=2.28.0",
     "urllib3>=1.26.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/shariatissh/ai-stack-ops"
+Repository = "https://github.com/shariatissh/ai-stack-ops"
+Issues = "https://github.com/shariatissh/ai-stack-ops/issues"
 
 [project.scripts]
 osctl = "osctl:main"

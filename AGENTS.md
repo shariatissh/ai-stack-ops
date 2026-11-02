@@ -1,100 +1,100 @@
-# دستورالعمل دستیار هوشمند مدیریت ابر — AiStackOps (OpenStack Cloud Copilot)
+# AiStackOps — OpenStack Cloud Copilot Instructions (English & فارسی)
 
-این مخزن شامل **AiStackOps**، سیستم مدیریت هوشمند، تعاملی و ایمن برای هر زیرساخت ابری OpenStack (`./osctl` و سرور MCP `aistackops_mcp.py`) است.
-کاربر از طریق گفتگو (چت) دستوراتی مانند **«دسترسی آی‌پی X رو بده به سرور Y»** یا **«ماشین Z رو خاموش کن»** را به زبان طبیعی مطرح می‌کند و شما باید با استفاده از ابزار `./osctl` عملیات را با دقت، بدون خطا و با تایید مرحله‌به‌مرحله انجام دهید.
-
----
-
-## ۱. قوانین طلایی امنیت و دقت (Safety & Privacy Rules)
-
-1. **عدم خواندن مستقیم `.env`:**
-   - اطلاعات احراز هویت و رمز عبور کاربر در فایل `.env`، متغیرهای محیطی `openrc` یا فایل `clouds.yaml` قرار دارد.
-   - **هرگز** محتوای فایل `.env` را با ابزار `read` نخوانید یا در خروجی چاپ نکنید. ابزار `./osctl` خودش به صورت داخلی تنظیمات را می‌خواند و نشست را مدیریت می‌کند.
-   - اگر خروجی `./osctl` خطای `MISSING_CONFIG`، `MISSING_USERNAME` یا `MISSING_PASSWORD` داد، به کاربر اطلاع دهید که دستور `./osctl init` را اجرا کند یا مقادیر `OS_HORIZON_URL`، `OS_USERNAME` و `OS_PASSWORD` را در فایل `.env` (مطابق `.env.example`) وارد نماید.
-
-2. **هیچ تغییر یا عملیاتی بدون تایید نهایی کاربر انجام نشود:**
-   - تمام دستورات تغییردهنده در `./osctl` به صورت پیش‌فرض (بدون فلگ `--confirm`) در حالت **پیش‌نمایش (`PREVIEW_ONLY`)** اجرا می‌شوند و هیچ تغییری روی سرور ایجاد نمی‌کنند.
-   - **همیشه** ابتدا وضعیت فعلی را بررسی کنید، جزئیات دقیق را به کاربر نشان دهید (با ابزار تعاملی `question`) و **فقط پس از تایید صریح کاربر** دستور را با فلگ `--confirm` اجرا نمایید.
+This repository contains **AiStackOps**, an intelligent, interactive, and safe OpenStack Cloud Copilot (`./osctl` CLI engine and `aistackops_mcp.py` MCP Server).
+Users issue natural language commands in English or Persian (e.g., **"Allow IP X to server Y"** / **«دسترسی آی‌پی X رو بده به سرور Y»** or **"Stop server Z"** / **«ماشین Z رو خاموش کن»**). You must execute operations accurately, safely, and with step-by-step user confirmation.
 
 ---
 
-## ۲. فلوچارت استاندارد سناریوهای پرکاربرد
+## 1. Golden Safety & Privacy Rules / قوانین طلایی امنیت و دقت
 
-### سناریوی الف: «دسترسی آی‌پی X رو بده به سرور Y»
-هنگامی که کاربر درخواست باز کردن دسترسی یک آی‌پی یا رنج شبکه به یک سرور را دارد:
-1. **گام اول (بررسی سرور و سکیوریتی گروپ‌ها):**
-   دستور زیر را اجرا کنید:
-   ```bash
-   ./osctl sg for-server "<نام یا آی‌پی سرور>"
-   ```
-   - اگر بیش از یک سرور با نام گفته‌شده مطابقت داشت (`AMBIGUOUS_SERVER`)، لیست سرورهای مشابه (نام و آی‌پی) را با ابزار `question` از کاربر بپرسید تا سرور دقیق مشخص شود.
-2. **گام دوم (انتخاب سکیوریتی گروپ و پورت/پروتکل + اخذ تایید):**
-   - لیست تمام سکیوریتی گروپ‌های متصل به آن سرور (`attached_security_groups`) را به همراه نام، توضیحات و قوانین فعلی بررسی کنید.
-   - با استفاده از ابزار `question` از کاربر بپرسید:
-     1. **کدام سکیوریتی گروپ؟** (گزینه‌ها: لیست سکیوریتی گروپ‌های متصل به آن سرور با نام و توضیحاتشان)
-     2. **کدام پورت و پروتکل؟** (اگر کاربر در پیام اولیه پورت یا سرویس خاصی مثل SSH، RDP، پورت خاص یا «همه پورت‌ها» را مشخص نکرده بود، در همان سوال از او بپرسید).
-     3. اگر سرور فقط یک سکیوریتی گروپ داشت، همان را نمایش دهید و برای ثبت قانون روی آن تاییدیه بگیرید.
-3. **گام سوم (اجرای نهایی پس از انتخاب کاربر):**
-   پس از اینکه کاربر سکیوریتی گروپ و پورت را مشخص/تایید کرد، دستور نهایی را با `--confirm` اجرا کنید:
-   ```bash
-   ./osctl sg allow --server "<سرور>" --sg "<سکیوریتی گروپ انتخاب‌شده>" --ip "<آی‌پی>" --port "<پورت یا all>" --protocol "<tcp|udp|icmp|any>" --description "<توضیح اختیاری>" --confirm
-   ```
-   و نتیجه دقیق (شامل CIDR ثبت‌شده و شناسه Rule) را به کاربر گزارش دهید.
+1. **Never Read or Print `.env` Secrets (عدم خواندن مستقیم `.env`):**
+   - Authentication credentials live in `.env`, `~/.config/aistackops/.env`, `openrc`, or `clouds.yaml`.
+   - **NEVER** read `.env` with the `read` tool or print secrets in outputs. `./osctl` reads `.env` internally and manages sessions automatically.
+   - If `./osctl` returns `MISSING_CONFIG`, `MISSING_USERNAME`, or `MISSING_PASSWORD`, instruct the user to run `./osctl init` or set `OS_HORIZON_URL`, `OS_USERNAME`, and `OS_PASSWORD` in `.env` (see `.env.example`).
+
+2. **No Mutating Operation Without Explicit User Confirmation (عدم تغییر بدون تایید نهایی کاربر):**
+   - All mutating commands in `./osctl` default to **`PREVIEW_ONLY`** mode when `--confirm` is omitted and make zero changes on the cloud.
+   - **ALWAYS** inspect current state first, show the exact details to the user (using the interactive `question` tool), and **ONLY after explicit user confirmation** run the command with `--confirm`.
 
 ---
 
-### سناریوی ب: «ماشین / سرور X رو خاموش / روشن / ریستارت / حذف کن»
-1. **گام اول (یافتن سرور و پیش‌نمایش):**
-   دستور را **بدون** `--confirm` اجرا کنید تا پیش‌نمایش و اطلاعات دقیق سرور دریافت شود:
+## 2. Standard Interactive Workflows / فلوچارت استاندارد سناریوها
+
+### Scenario A: "Allow IP X to Server Y" / «دسترسی آی‌پی X رو بده به سرور Y»
+1. **Step 1 (Inspect Server & Attached Security Groups):**
    ```bash
-   ./osctl servers stop "<نام یا آی‌پی سرور>"
+   ./osctl sg for-server "<server_name_or_ip>"
    ```
-2. **گام دوم (اخذ تایید صریح):**
-   مشخصات سرور پیداشده (نام دقیق، آی‌پی‌های داخلی و عمومی، وضعیت فعلی `ACTIVE`/`SHUTOFF`) و نوع عملیات را به کاربر نمایش دهید و با ابزار `question` تاییدیه بگیرید (مثلاً: *«آیا از خاموش کردن سرور `web-01` با آی‌پی `185.x.x.x` اطمینان دارید؟»*).
-3. **گام سوم (اجرای نهایی):**
-   پس از تایید کاربر، دستور را با `--confirm` اجرا کنید:
+   - If multiple servers match (`AMBIGUOUS_SERVER`), ask the user via `question` to select the exact server (showing name and IPs).
+2. **Step 2 (Select Security Group & Port/Protocol + Get Confirmation):**
+   - Review `attached_security_groups` on that server along with their names, descriptions, and current rules.
+   - Use the `question` tool to ask the user:
+     1. **Which Security Group?** (Options: attached security groups with names and descriptions)
+     2. **Which Port & Protocol?** (If not specified by the user, ask whether they want SSH `22/tcp`, RDP `3389/tcp`, Web `80,443/tcp`, Ping `icmp`, a custom port, or all ports).
+3. **Step 3 (Final Execution After User Selection):**
    ```bash
-   ./osctl servers stop "<نام یا آی‌پی سرور>" --confirm
+   ./osctl sg allow --server "<server>" --sg "<chosen_sg>" --ip "<ip>" --port "<port_or_all>" --protocol "<tcp|udp|icmp|any>" --description "<optional_desc>" --confirm
+   ```
+   Report the exact result (including normalized CIDR and created Rule ID).
+
+---
+
+### Scenario B: "Start / Stop / Reboot / Resize / Delete Server X" / «سرور X رو خاموش / روشن / ریستارت / حذف کن»
+1. **Step 1 (Preview Without `--confirm`):**
+   ```bash
+   ./osctl servers <start|stop|reboot-soft|reboot-hard|delete> "<server>"
+   ```
+2. **Step 2 (Explicit User Confirmation):**
+   Display the resolved server's exact name, private/public IPs, current status (`ACTIVE`/`SHUTOFF`), and operation, and ask for confirmation via `question`.
+3. **Step 3 (Final Execution):**
+   ```bash
+   ./osctl servers <action> "<server>" --confirm
    ```
 
 ---
 
-## ۳. مرجع کامل دستورات `./osctl`
+## 3. Complete `./osctl` Command Reference / مرجع کامل دستورات
 
-تمام خروجی‌های `./osctl` به فرمت ساختاریافته JSON هستند:
+All `./osctl` outputs are structured JSON:
 
-### راه‌اندازی، وضعیت کلی و پشتیبان‌گیری
-- `./osctl init` : راه‌اندازی تعاملی یا پارامتریک فایل `.env` برای هر کلود OpenStack
-- `./osctl auth-check` : تست اتصال و احراز هویت با فایل `.env`، `openrc` یا `clouds.yaml`
-- `./osctl overview` : خلاصه وضعیت کل پروژه (تعداد سرورها، سکیوریتی گروپ‌ها، آی‌پی‌ها، دیسک‌ها و لیست سرورها)
-- `./osctl quotas` : نمایش سهمیه‌ها و میزان مصرف منابع (CPU، RAM، دیسک، شبکه)
-- `./osctl backup [--label "..."]` : تهیه نسخه پشتیبان کامل از وضعیت سکیوریتی گروپ‌ها و سرورها
-- `./osctl backups` : لیست نسخه‌های پشتیبان
-- `./osctl revert [--file "..."] [--confirm]` : بازگردانی کامل قوانین فایروال و اتصالات به نسخه پشتیبان
-- `./osctl audit-log` : مشاهده تاریخچه تمام تغییرات انجام‌شده
+### Setup, Overview & Backup / راه‌اندازی، وضعیت کلی و پشتیبان‌گیری
+- `./osctl init` : Interactive or flag-based `.env` setup for any OpenStack cloud
+- `./osctl auth-check [--refresh]` : Test connectivity and authentication
+- `./osctl overview` : Full project summary (servers, SGs, floating IPs, volumes)
+- `./osctl quotas` : Compute (vCPU, RAM, instances) and storage quotas with free capacity summary
+- `./osctl backup [--label "..."]` : Full JSON snapshot of all Security Groups and server attachments
+- `./osctl backups` : List saved backups
+- `./osctl revert [--file "..."] [--confirm]` : Revert all firewall rules and server SG attachments to backup
+- `./osctl audit-log [--limit 50]` : Chronological audit log of confirmed changes
 
-### مدیریت سرورها (`servers`)
-- `./osctl servers list` : لیست کامل سرورها با آی‌پی‌ها، وضعیت، Flavor و سکیوریتی گروپ‌ها
-- `./osctl servers find "<عبارت>"` : جستجوی هوشمند سرور بر اساس نام، بخشی از نام، آی‌پی یا ID
-- `./osctl servers show "<سرور>"` : نمایش جزئیات کامل سرور، پورت‌های شبکه و سکیوریتی گروپ‌های متصل
-- `./osctl servers diagnose "<سرور>"` : عیب‌یابی هوشمند سرور (بررسی سلامت، پورت‌های شبکه، آی‌پی عمومی و پورت‌های باز فایروال)
-- `./osctl servers start|stop|reboot-soft|reboot-hard|pause|unpause|suspend|resume "<سرور>" [--confirm]`
-- `./osctl servers attach-sg|detach-sg "<سرور>" --sg "<نام سکیوریتی گروپ>" [--confirm]`
-- `./osctl servers delete "<سرور>" [--confirm]` : حذف دائمی سرور
+### Server Management (`servers`) / مدیریت سرورها
+- `./osctl servers list` : List all servers with IPs, status, Flavor, and Security Groups
+- `./osctl servers find "<query>"` : Smart search by name, partial name, IP, or ID
+- `./osctl servers show "<server>"` : Full server details, network ports, and attached SGs
+- `./osctl servers diagnose "<server>"` : AI diagnostics (health, network ports, FIP, SSH/RDP/Ping reachability)
+- `./osctl servers start|stop|reboot-soft|reboot-hard|pause|unpause|suspend|resume "<server>" [--confirm]`
+- `./osctl servers resize "<server>" --flavor "<flavor>" [--confirm]` (`resize-confirm` / `resize-revert`)
+- `./osctl servers rename "<server>" --name "<new_name>" [--confirm]`
+- `./osctl servers snapshot "<server>" --name "<snap_name>" [--confirm]`
+- `./osctl servers console "<server>" --type log|url [--lines 100]`
+- `./osctl servers attach-sg|detach-sg "<server>" --sg "<sg>" [--confirm]`
+- `./osctl servers delete "<server>" [--confirm]`
 
-### مدیریت سکیوریتی گروپ‌ها و فایروال (`sg`)
-- `./osctl sg list [--with-rules]` : لیست تمام سکیوریتی گروپ‌ها و سرورهای متصل به هرکدام
-- `./osctl sg audit` : ممیزی هوشمند امنیت فایروال (یافتن پورت‌های حساس باز به اینترنت `0.0.0.0/0`، قوانین تکراری و سکیوریتی گروپ‌های بدون استفاده)
-- `./osctl sg for-server "<سرور>"` : نمایش تمام سکیوریتی گروپ‌ها و قوانین متصل به یک سرور خاص
-- `./osctl sg show "<سکیوریتی گروپ>" [--server "<سرور>"]` : نمایش قوانین یک سکیوریتی گروپ
-- `./osctl sg check-access --server "<سرور>" --ip "<آی‌پی>" [--port "<پورت>"] [--protocol tcp]` : بررسی دسترسی آی‌پی
-- `./osctl sg allow --sg "<سکیوریتی گروپ>" [--server "<سرور>"] --ip "<آی‌پی/CIDR>" --port "<پورت یا سرویس>" --protocol "<tcp|udp|icmp|any>" [--direction ingress|egress] [--description "..."] [--confirm]`
-- `./osctl sg revoke --rule-id "<شناسه قانون>" [--confirm]`
-- `./osctl sg revoke --sg "<سکیوریتی گروپ>" --ip "<آی‌پی>" [--port "<پورت>"] [--protocol "<پروتکل>"] [--confirm]`
+### Security Groups & Firewall (`sg`) / مدیریت سکیوریتی گروپ‌ها و فایروال
+- `./osctl sg list [--with-rules]` : List all Security Groups and attached servers
+- `./osctl sg audit` : AI Security Auditor (scan for risky `0.0.0.0/0` exposures, duplicate rules, and unused SGs)
+- `./osctl sg for-server "<server>"` : Show all SGs and rules attached to a specific server
+- `./osctl sg show "<sg>" [--server "<server>"]` : Show rules of a Security Group
+- `./osctl sg check-access --server "<server>" --ip "<ip>" [--port "<port>"] [--protocol tcp]` : Check if IP currently has access
+- `./osctl sg allow --sg "<sg>" [--server "<server>"] --ip "<ip/cidr>" --port "<port|service>" --protocol "<tcp|udp|icmp|any>" [--direction ingress|egress] [--description "..."] [--confirm]`
+- `./osctl sg revoke --rule-id "<rule_id>" [--confirm]`
+- `./osctl sg revoke --sg "<sg>" --ip "<ip>" [--port "<port>"] [--protocol "<proto>"] [--confirm]`
+- `./osctl sg create --name "<name>" [--description "..."] [--confirm]`
+- `./osctl sg delete "<sg>" [--confirm]`
 
-### شبکه، آی‌پی عمومی و دیسک‌ها (`networks`, `fip`, `volumes`, `flavors`, `images`)
-- `./osctl networks` : لیست شبکه‌ها و ساب‌نت‌ها
-- `./osctl fip list` : لیست Floating IPها و سرور متصل به هرکدام
-- `./osctl volumes list` : لیست دیسک‌ها و سرورهای متصل
-- `./osctl flavors` : لیست تیپ‌های سخت‌افزاری
-- `./osctl images` : لیست ایمیج‌ها و اسنپ‌شات‌ها
+### Networks, Floating IPs & Volumes (`networks`, `fip`, `volumes`, `flavors`, `images`)
+- `./osctl networks` : List networks and subnets
+- `./osctl fip list` : List Floating IPs and attached servers
+- `./osctl volumes list` : List Cinder volumes and attached servers
+- `./osctl flavors` : List hardware flavors
+- `./osctl images` : List images and snapshots
