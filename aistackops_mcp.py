@@ -162,6 +162,26 @@ TOOLS: List[Dict[str, Any]] = [
             "required": ["server"],
         },
     },
+    {
+        "name": "openstack_quotas",
+        "description": "Get OpenStack project compute (CPU, RAM, instances) and volume storage quotas and current usage.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "openstack_volumes_list",
+        "description": "List all Cinder volumes (disks) and the servers they are attached to.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "openstack_fip_list",
+        "description": "List all Floating IPs (public IPs) and their associated servers.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "openstack_networks_list",
+        "description": "List all Neutron networks and subnets in the project.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -235,6 +255,14 @@ def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         return osctl.cmd_sg_audit(client, argparse.Namespace())
     if name == "openstack_server_diagnose":
         return osctl.cmd_servers_diagnose(client, argparse.Namespace(server=arguments["server"]))
+    if name == "openstack_quotas":
+        return osctl.cmd_quotas_show(client, argparse.Namespace())
+    if name == "openstack_volumes_list":
+        return osctl.cmd_volumes_list(client, argparse.Namespace())
+    if name == "openstack_fip_list":
+        return osctl.cmd_fip_list(client, argparse.Namespace())
+    if name == "openstack_networks_list":
+        return osctl.cmd_network_list(client, argparse.Namespace())
 
     raise ValueError(f"Unknown tool: {name}")
 

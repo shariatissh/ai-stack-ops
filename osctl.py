@@ -665,6 +665,30 @@ class OpenStackClient:
                 status_code=resp.status_code,
             )
 
+    def delete_volume(self, volume_id: str) -> None:
+        """Delete a volume via Horizon table action."""
+        if not self.authenticated:
+            self.authenticate()
+        vol_url = f"{self.base_url}/project/volumes/"
+        r_page = self.session.get(vol_url, timeout=self.config["timeout"])
+        m_csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', r_page.text)
+        csrf_val = m_csrf.group(1) if m_csrf else self.session.cookies.get("csrftoken", "")
+
+        action_val = f"volumes__delete__{volume_id}"
+        resp = self.session.post(
+            vol_url,
+            data={"csrfmiddlewaretoken": csrf_val, "action": action_val},
+            headers={"Referer": vol_url},
+            timeout=self.config["timeout"],
+            allow_redirects=True,
+        )
+        if resp.status_code not in (200, 201, 202, 204, 302):
+            raise OpenStackError(
+                f"خطا در حذف دیسک '{volume_id}' (کد {resp.status_code}).",
+                code="VOLUME_DELETE_FAILED",
+                status_code=resp.status_code,
+            )
+
     # --------------------------------------------------------------------------
     # Network & Security Groups (Neutron via Horizon) Helpers
     # --------------------------------------------------------------------------
@@ -995,6 +1019,160 @@ class OpenStackClient:
                 code="DELETE_RULE_FAILED",
                 status_code=resp.status_code,
             )
+
+    def horizon_create_sg(self, name: str, description: str = "") -> Dict[str, Any]:
+        """Create a new Security Group via Horizon."""
+        if not self.authenticated:
+            self.authenticate()
+        create_url = f"{self.base_url}/project/security_groups/create/"
+        r_form = self.session.get(
+            create_url,
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        m_csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', r_form.text)
+        csrf_val = m_csrf.group(1) if m_csrf else self.session.cookies.get("csrftoken", "")
+
+        resp = self.session.post(
+            create_url,
+            data={"csrfmiddlewaretoken": csrf_val, "name": name, "description": description},
+            headers={"Referer": f"{self.base_url}/project/security_groups/", "X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        if resp.status_code not in (200, 201, 202, 204, 302):
+            raise OpenStackError(
+                f"خطا در ساخت سکیوریتی گروپ '{name}' (کد {resp.status_code}).",
+                code="CREATE_SG_FAILED",
+                status_code=resp.status_code,
+            )
+        return self.resolve_single_sg(name)
+
+    def horizon_delete_sg(self, sg_id: str) -> None:
+        """Delete a Security Group via Horizon."""
+        if not self.authenticated:
+            self.authenticate()
+        sg_url = f"{self.base_url}/project/security_groups/"
+        r_page = self.session.get(sg_url, timeout=self.config["timeout"])
+        m_csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', r_page.text)
+        csrf_val = m_csrf.group(1) if m_csrf else self.session.cookies.get("csrftoken", "")
+
+        action_val = f"security_groups__delete__{sg_id}"
+        resp = self.session.post(
+            sg_url,
+            data={"csrfmiddlewaretoken": csrf_val, "action": action_val},
+            headers={"Referer": sg_url},
+            timeout=self.config["timeout"],
+        )
+        if resp.status_code not in (200, 201, 202, 204, 302):
+            raise OpenStackError(
+                f"خطا در حذف سکیوریتی گروپ '{sg_id}' (کد {resp.status_code}).",
+                code="DELETE_SG_FAILED",
+                status_code=resp.status_code,
+            )
+
+    def horizon_rename_server(self, server_id: str, new_name: str) -> None:
+        """Rename a server via Horizon."""
+        if not self.authenticated:
+            self.authenticate()
+        update_url = f"{self.base_url}/project/instances/{server_id}/update"
+        r_form = self.session.get(
+            update_url,
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        m_csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', r_form.text)
+        csrf_val = m_csrf.group(1) if m_csrf else self.session.cookies.get("csrftoken", "")
+        resp = self.session.post(
+            update_url,
+            data={
+                "csrfmiddlewaretoken": csrf_val,
+                "name": new_name,
+                "description": "",
+            },
+            headers={"Referer": f"{self.base_url}/project/instances/", "X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        if resp.status_code not in (200, 201, 202, 204, 302):
+            raise OpenStackError(
+                f"خطا در تغییر نام سرور (کد {resp.status_code}).",
+                code="RENAME_SERVER_FAILED",
+                status_code=resp.status_code,
+            )
+
+    def horizon_snapshot_server(self, server_id: str, snapshot_name: str) -> None:
+        """Create an instance snapshot via Horizon."""
+        if not self.authenticated:
+            self.authenticate()
+        snap_url = f"{self.base_url}/project/instances/{server_id}/create_snapshot"
+        r_form = self.session.get(
+            snap_url,
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        m_csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', r_form.text)
+        csrf_val = m_csrf.group(1) if m_csrf else self.session.cookies.get("csrftoken", "")
+        resp = self.session.post(
+            snap_url,
+            data={"csrfmiddlewaretoken": csrf_val, "instance_id": server_id, "name": snapshot_name},
+            headers={"Referer": f"{self.base_url}/project/instances/", "X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        if resp.status_code not in (200, 201, 202, 204, 302):
+            raise OpenStackError(
+                f"خطا در ساخت اسنپ‌شات از سرور (کد {resp.status_code}).",
+                code="SNAPSHOT_SERVER_FAILED",
+                status_code=resp.status_code,
+            )
+
+    def horizon_resize_server(self, server_id: str, flavor_id: str, server_name: str) -> None:
+        """Resize a server to a new flavor via Horizon."""
+        if not self.authenticated:
+            self.authenticate()
+        resize_url = f"{self.base_url}/project/instances/{server_id}/resize"
+        r_form = self.session.get(
+            resize_url,
+            headers={"X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        m_csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', r_form.text)
+        csrf_val = m_csrf.group(1) if m_csrf else self.session.cookies.get("csrftoken", "")
+        resp = self.session.post(
+            resize_url,
+            data={
+                "csrfmiddlewaretoken": csrf_val,
+                "instance_id": server_id,
+                "name": server_name,
+                "flavor": flavor_id,
+                "disk_config": "AUTO",
+            },
+            headers={"Referer": f"{self.base_url}/project/instances/", "X-Requested-With": "XMLHttpRequest"},
+            timeout=self.config["timeout"],
+        )
+        if resp.status_code not in (200, 201, 202, 204, 302):
+            raise OpenStackError(
+                f"خطا در تغییر منابع (Resize) سرور (کد {resp.status_code}).",
+                code="RESIZE_SERVER_FAILED",
+                status_code=resp.status_code,
+            )
+
+    def horizon_server_console(self, server_id: str, console_type: str = "log", lines: int = 100) -> Dict[str, Any]:
+        """Fetch server boot console log or VNC console URL."""
+        if not self.authenticated:
+            self.authenticate()
+        if console_type == "url":
+            resp = self.api_request("POST", f"/api/nova/servers/{server_id}/console-output/", json_body={"length": lines}, expected_status=(200, 201, 202, 400, 404))
+            inst_url = f"{self.base_url}/project/instances/{server_id}/?tab=instance_details__console"
+            return {"console_tab_url": inst_url}
+        try:
+            data = self.api_request("POST", f"/api/nova/servers/{server_id}/console-output/", json_body={"length": lines})
+            return {"lines": data.get("data", "")}
+        except Exception:
+            r_log = self.session.get(
+                f"{self.base_url}/project/instances/{server_id}/console",
+                params={"length": lines},
+                timeout=self.config["timeout"],
+            )
+            return {"lines": r_log.text}
 
 
 def normalize_ip_cidr(ip_input: str) -> Tuple[str, str]:
@@ -1330,6 +1508,96 @@ def cmd_servers_delete(client: OpenStackClient, args: argparse.Namespace) -> Dic
     }
 
 
+def cmd_servers_rename(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
+    srv = client.resolve_single_server(args.server)
+    new_name = args.name.strip()
+    plan = {
+        "action": "rename_server",
+        "server": {"id": srv["id"], "current_name": srv["name"], "new_name": new_name, "ips": srv["ips"]},
+    }
+    if not args.confirm:
+        return {
+            "mode": "PREVIEW_ONLY",
+            "requires_confirmation": True,
+            "message": f"پیش‌نمایش تغییر نام سرور از '{srv['name']}' به '{new_name}'.",
+            "plan": plan,
+        }
+    client.horizon_rename_server(srv["id"], new_name)
+    write_audit_log("server.rename", f"{srv['name']} -> {new_name} ({srv['id']})", plan, "SUCCESS")
+    return {
+        "mode": "EXECUTED",
+        "success": True,
+        "message": f"نام سرور با موفقیت از '{srv['name']}' به '{new_name}' تغییر یافت.",
+        "details": plan,
+    }
+
+
+def cmd_servers_snapshot(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
+    srv = client.resolve_single_server(args.server)
+    snap_name = args.name.strip()
+    plan = {
+        "action": "snapshot_server",
+        "server": {"id": srv["id"], "name": srv["name"], "status": srv["status"], "ips": srv["ips"]},
+        "snapshot_name": snap_name,
+    }
+    if not args.confirm:
+        return {
+            "mode": "PREVIEW_ONLY",
+            "requires_confirmation": True,
+            "message": f"پیش‌نمایش تهیه اسنپ‌شات '{snap_name}' از سرور '{srv['name']}'.",
+            "plan": plan,
+        }
+    client.horizon_snapshot_server(srv["id"], snap_name)
+    write_audit_log("server.snapshot", f"{srv['name']} ({srv['id']})", plan, "SUCCESS")
+    return {
+        "mode": "EXECUTED",
+        "success": True,
+        "message": f"درخواست تهیه اسنپ‌شات '{snap_name}' برای سرور '{srv['name']}' با موفقیت ثبت شد.",
+        "details": plan,
+    }
+
+
+def cmd_servers_resize(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
+    srv = client.resolve_single_server(args.server)
+    flv = client.resolve_flavor(args.flavor)
+    plan = {
+        "action": "resize_server",
+        "server": {"id": srv["id"], "name": srv["name"], "current_flavor": srv["flavor"], "ips": srv["ips"]},
+        "target_flavor": {
+            "id": flv.get("id"),
+            "name": flv.get("name"),
+            "vcpus": flv.get("vcpus"),
+            "ram_mb": flv.get("ram"),
+            "disk_gb": flv.get("disk"),
+        },
+    }
+    if not args.confirm:
+        return {
+            "mode": "PREVIEW_ONLY",
+            "requires_confirmation": True,
+            "message": f"پیش‌نمایش ارتقا/تغییر منابع سرور '{srv['name']}' به تیپ '{flv.get('name')}'.",
+            "plan": plan,
+        }
+    client.horizon_resize_server(srv["id"], str(flv["id"]), srv["name"])
+    write_audit_log("server.resize", f"{srv['name']} ({srv['id']})", plan, "SUCCESS")
+    return {
+        "mode": "EXECUTED",
+        "success": True,
+        "message": f"عملیات تغییر منابع سرور '{srv['name']}' به '{flv.get('name')}' آغاز شد (پس از اتمام، با resize-confirm نهایی کنید).",
+        "details": plan,
+    }
+
+
+def cmd_servers_console(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
+    srv = client.resolve_single_server(args.server)
+    res = client.horizon_server_console(srv["id"], console_type=args.type, lines=args.lines)
+    return {
+        "server": {"id": srv["id"], "name": srv["name"], "status": srv["status"], "ips": srv["ips"]},
+        "console_type": args.type,
+        "console": res,
+    }
+
+
 # --- Security Groups & Firewall Commands ---
 
 def cmd_sg_list(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
@@ -1605,6 +1873,60 @@ def cmd_sg_revoke(client: OpenStackClient, args: argparse.Namespace) -> Dict[str
     }
 
 
+def cmd_sg_create(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
+    name = args.name.strip()
+    desc = (args.description or "").strip()
+    existing = [s for s in client.list_security_groups() if (s["name"] or "").lower() == name.lower()]
+    if existing:
+        return {
+            "mode": "ALREADY_EXISTS",
+            "success": True,
+            "message": f"سکیوریتی گروپ با نام '{name}' از قبل وجود دارد.",
+            "security_group": existing[0],
+        }
+    plan = {"action": "create_security_group", "name": name, "description": desc}
+    if not args.confirm:
+        return {
+            "mode": "PREVIEW_ONLY",
+            "requires_confirmation": True,
+            "message": f"پیش‌نمایش ساخت سکیوریتی گروپ جدید با نام '{name}'.",
+            "plan": plan,
+        }
+    created = client.horizon_create_sg(name, desc)
+    write_audit_log("sg.create", f"{created['name']} ({created['id']})", plan, "SUCCESS")
+    return {
+        "mode": "EXECUTED",
+        "success": True,
+        "message": f"سکیوریتی گروپ '{name}' با موفقیت ساخته شد.",
+        "security_group": created,
+    }
+
+
+def cmd_sg_delete(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
+    sg = client.resolve_single_sg(args.sg)
+    if sg["name"] == "default":
+        raise OpenStackError("سکیوریتی گروپ پیش‌فرض (default) قابل حذف نیست.", code="CANNOT_DELETE_DEFAULT_SG")
+    plan = {
+        "action": "delete_security_group",
+        "security_group": {"id": sg["id"], "name": sg["name"], "description": sg["description"], "rules_count": sg["rules_count"]},
+    }
+    if not args.confirm:
+        return {
+            "mode": "PREVIEW_ONLY",
+            "requires_confirmation": True,
+            "message": f"پیش‌نمایش حذف سکیوریتی گروپ '{sg['name']}'.",
+            "plan": plan,
+        }
+    client.horizon_delete_sg(sg["id"])
+    write_audit_log("sg.delete", f"{sg['name']} ({sg['id']})", plan, "SUCCESS")
+    return {
+        "mode": "EXECUTED",
+        "success": True,
+        "message": f"سکیوریتی گروپ '{sg['name']}' با موفقیت حذف شد.",
+        "details": plan,
+    }
+
+
 def cmd_sg_audit(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
     """AI Security Auditor: Scan all Security Groups for risky 0.0.0.0/0 exposures, duplicates, and unused SGs."""
     sgs = client.list_security_groups()
@@ -1846,6 +2168,56 @@ def cmd_volumes_list(client: OpenStackClient, args: argparse.Namespace) -> Dict[
     return {"count": len(result), "volumes": result}
 
 
+def cmd_volumes_delete(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
+    vol_ids = args.volume_ids
+    all_vols = {v["id"]: v for v in client.api_get("/api/cinder/volumes/").get("items", [])}
+    vols_to_delete = []
+    for vid in vol_ids:
+        if vid not in all_vols:
+            raise OpenStackError(f"دیسک با شناسه '{vid}' یافت نشد.", code="VOLUME_NOT_FOUND")
+        v = all_vols[vid]
+        if v.get("attachments"):
+            raise OpenStackError(
+                f"دیسک '{vid}' در حال استفاده توسط سرور است و نمی‌توان آن را مستقیماً حذف کرد.",
+                code="VOLUME_IN_USE",
+            )
+        vols_to_delete.append(
+            {
+                "id": v["id"],
+                "name": v.get("name") or "",
+                "size_gb": v.get("size", 0),
+                "status": v.get("status"),
+            }
+        )
+
+    plan = {
+        "action": "DELETE_VOLUMES",
+        "volumes": vols_to_delete,
+        "total_freed_gb": sum(v["size_gb"] for v in vols_to_delete),
+        "warning": "این عملیات غیرقابل بازگشت است و دیسک(ها) به طور کامل حذف خواهند شد!",
+    }
+    if not args.confirm:
+        return {
+            "mode": "PREVIEW_ONLY",
+            "requires_confirmation": True,
+            "message": "پیش‌نمایش حذف دیسک‌ها. برای اجرا نیاز به تایید صریح کاربر و فلگ --confirm است.",
+            "plan": plan,
+        }
+
+    deleted = []
+    for v in vols_to_delete:
+        client.delete_volume(v["id"])
+        deleted.append(v["id"])
+        write_audit_log("volume.delete", v["id"], v, "SUCCESS")
+
+    return {
+        "mode": "EXECUTED",
+        "success": True,
+        "message": f"{len(deleted)} دیسک با موفقیت حذف شد(ند) و {plan['total_freed_gb']} گیگابایت فضا آزاد گردید.",
+        "deleted_volumes": vols_to_delete,
+    }
+
+
 # --- Flavors, Images, Quotas, Audit ---
 
 def cmd_flavors_list(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
@@ -1884,8 +2256,43 @@ def cmd_images_list(client: OpenStackClient, args: argparse.Namespace) -> Dict[s
 
 
 def cmd_quotas_show(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
-    limits = client.api_get("/api/nova/limits/")
-    return {"limits": limits}
+    compute_limits = client.api_get("/api/nova/limits/")
+    volume_limits: Dict[str, Any] = {}
+    try:
+        volume_limits = client.api_get("/api/cinder/tenantabsolutelimits/")
+    except Exception:
+        pass
+
+    def sanitize(d: Dict[str, Any]) -> Dict[str, Any]:
+        return {k: ("UNLIMITED" if v == float("inf") or v == -1 else v) for k, v in d.items()}
+
+    c_clean = sanitize(compute_limits) if isinstance(compute_limits, dict) else compute_limits
+    v_clean = sanitize(volume_limits) if isinstance(volume_limits, dict) else volume_limits
+
+    summary = {}
+    if isinstance(compute_limits, dict):
+        cores_used = compute_limits.get("totalCoresUsed", 0)
+        cores_max = compute_limits.get("maxTotalCores", 0)
+        ram_used_mb = compute_limits.get("totalRAMUsed", 0)
+        ram_max_mb = compute_limits.get("maxTotalRAMSize", 0)
+        inst_used = compute_limits.get("totalInstancesUsed", 0)
+        inst_max = compute_limits.get("maxTotalInstances", 0)
+        summary["vcpus"] = {"used": cores_used, "max": cores_max, "free": max(0, cores_max - cores_used) if isinstance(cores_max, (int, float)) and cores_max != float("inf") else "UNLIMITED"}
+        summary["ram_gb"] = {
+            "used": round(ram_used_mb / 1024, 1),
+            "max": round(ram_max_mb / 1024, 1) if isinstance(ram_max_mb, (int, float)) and ram_max_mb != float("inf") else "UNLIMITED",
+            "free": round(max(0, ram_max_mb - ram_used_mb) / 1024, 1) if isinstance(ram_max_mb, (int, float)) and ram_max_mb != float("inf") else "UNLIMITED",
+        }
+        summary["instances"] = {"used": inst_used, "max": inst_max, "free": max(0, inst_max - inst_used) if isinstance(inst_max, (int, float)) and inst_max != float("inf") else "UNLIMITED"}
+    if isinstance(volume_limits, dict) and volume_limits:
+        gb_used = volume_limits.get("totalGigabytesUsed", 0)
+        gb_max = volume_limits.get("maxTotalVolumeGigabytes", 0)
+        vol_used = volume_limits.get("totalVolumesUsed", 0)
+        vol_max = volume_limits.get("maxTotalVolumes", 0)
+        summary["storage_gb"] = {"used": gb_used, "max": gb_max, "free": max(0, gb_max - gb_used) if isinstance(gb_max, (int, float)) and gb_max != float("inf") else "UNLIMITED"}
+        summary["volumes"] = {"used": vol_used, "max": vol_max, "free": max(0, vol_max - vol_used) if isinstance(vol_max, (int, float)) and vol_max != float("inf") else "UNLIMITED"}
+
+    return {"summary": summary, "limits": c_clean, "volume_limits": v_clean}
 
 
 def cmd_backup_create(client: OpenStackClient, args: argparse.Namespace) -> Dict[str, Any]:
@@ -2274,6 +2681,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_srv_del.add_argument("--confirm", action="store_true")
     p_srv_del.set_defaults(func=cmd_servers_delete)
 
+    p_srv_ren = srv_sub.add_parser("rename", help="تغییر نام سرور")
+    p_srv_ren.add_argument("server", help="نام، آی‌پی یا شناسه سرور")
+    p_srv_ren.add_argument("--name", required=True, help="نام جدید سرور")
+    p_srv_ren.add_argument("--confirm", action="store_true")
+    p_srv_ren.set_defaults(func=cmd_servers_rename)
+
+    p_srv_snap = srv_sub.add_parser("snapshot", help="تهیه اسنپ‌شات از سرور")
+    p_srv_snap.add_argument("server", help="نام، آی‌پی یا شناسه سرور")
+    p_srv_snap.add_argument("--name", required=True, help="نام اسنپ‌شات")
+    p_srv_snap.add_argument("--confirm", action="store_true")
+    p_srv_snap.set_defaults(func=cmd_servers_snapshot)
+
+    p_srv_resz = srv_sub.add_parser("resize", help="ارتقا یا تغییر منابع سرور (Flavor)")
+    p_srv_resz.add_argument("server", help="نام، آی‌پی یا شناسه سرور")
+    p_srv_resz.add_argument("--flavor", required=True, help="نام یا شناسه تیپ سخت‌افزاری جدید")
+    p_srv_resz.add_argument("--confirm", action="store_true")
+    p_srv_resz.set_defaults(func=cmd_servers_resize)
+
+    p_srv_con = srv_sub.add_parser("console", help="دریافت لاگ بوت کنسول یا لینک کنسول وب سرور")
+    p_srv_con.add_argument("server", help="نام، آی‌پی یا شناسه سرور")
+    p_srv_con.add_argument("--type", default="log", choices=["log", "url"], help="نوع خروجی کنسول (log یا url)")
+    p_srv_con.add_argument("--lines", type=int, default=100, help="تعداد خطوط لاگ")
+    p_srv_con.set_defaults(func=cmd_servers_console)
+
     # 4. sg (Security Groups)
     p_sg = sub.add_parser("sg", help="مدیریت سکیوریتی گروپ‌ها و قوانین فایروال (Neutron)")
     sg_sub = p_sg.add_subparsers(dest="sg_cmd", required=True)
@@ -2327,6 +2758,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_sg_revoke.add_argument("--confirm", action="store_true", help="تایید حذف نهایی")
     p_sg_revoke.set_defaults(func=cmd_sg_revoke)
 
+    p_sg_crt = sg_sub.add_parser("create", help="ساخت سکیوریتی گروپ جدید")
+    p_sg_crt.add_argument("--name", required=True, help="نام سکیوریتی گروپ جدید")
+    p_sg_crt.add_argument("--description", default="", help="توضیحات سکیوریتی گروپ")
+    p_sg_crt.add_argument("--confirm", action="store_true")
+    p_sg_crt.set_defaults(func=cmd_sg_create)
+
+    p_sg_del = sg_sub.add_parser("delete", help="حذف سکیوریتی گروپ")
+    p_sg_del.add_argument("sg", help="نام یا شناسه سکیوریتی گروپ")
+    p_sg_del.add_argument("--confirm", action="store_true")
+    p_sg_del.set_defaults(func=cmd_sg_delete)
+
     # 5. network & fip
     p_net = sub.add_parser("networks", help="لیست شبکه‌ها و ساب‌نت‌ها")
     p_net.set_defaults(func=cmd_network_list)
@@ -2343,6 +2785,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_vol_list = vol_sub.add_parser("list", help="لیست تمام دیسک‌ها")
     p_vol_list.set_defaults(func=cmd_volumes_list)
+
+    p_vol_del = vol_sub.add_parser("delete", help="حذف یک یا چند دیسک بدون اتصال")
+    p_vol_del.add_argument("volume_ids", nargs="+", help="شناسه یک یا چند دیسک برای حذف")
+    p_vol_del.add_argument("--confirm", action="store_true", help="تایید اجرای حذف بدون بازگشت")
+    p_vol_del.set_defaults(func=cmd_volumes_delete)
 
     # 7. flavors, images, quotas, audit
     p_flv = sub.add_parser("flavors", help="لیست تیپ‌های سخت‌افزاری (Flavors)")
