@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aistackops"
+version = "1.0.0"
+description = "AiStackOps - Universal AI-Native OpenStack Cloud Copilot (Skill + MCP Server + Safe CLI)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = [
+    "requests>=2.28.0",
+    "urllib3>=1.26.0",
+]
+
+[project.scripts]
+osctl = "osctl:main"
+aistackops = "osctl:main"
+aistackops-mcp = "aistackops_mcp:main"
+
+[tool.setuptools]
+py-modules = ["osctl", "aistackops_mcp"]

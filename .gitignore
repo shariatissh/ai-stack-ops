@@ -1,0 +1,22 @@
+# Secrets & Environment Configurations
+.env
+.env.*
+!.env.example
+clouds.yaml
+clouds.yml
+openrc*
+
+# Runtime Logs, Backups & Token Cache
+audit.log
+backups/
+.os_token_cache.json
+
+# Python Bytecode & Packaging
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
